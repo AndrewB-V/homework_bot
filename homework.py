@@ -1,10 +1,12 @@
+import logging
 import os
 import time
-import logging
 
 import requests
 import telegram
 import dotenv
+
+import exceptions
 
 dotenv.load_dotenv()
 
@@ -15,7 +17,6 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 RETRY_TIME = 600
 ENDPOINT = "https://practicum.yandex.ru/api/user_api/homework_statuses/"
 HEADERS = {"Authorization": f'OAuth {PRACTICUM_TOKEN}'}
-
 VERDICTS = {
     "approved": "Работа проверена: ревьюеру всё понравилось. Ура!",
     "reviewing": "Работа взята на проверку ревьюером.",
@@ -23,44 +24,20 @@ VERDICTS = {
 }
 
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='logger.log',
-    filemode='w',
-    format='%(asctime)s - %(levelname)s - %(message)s - %(name)s'
-)
 logger = logging.getLogger(__name__)
 logger.addHandler(
     logging.StreamHandler()
 )
 
 
-class MessageError:
-    """Ошибка отправки сообщения."""
-
-    pass
-
-
-class TokenError:
-    """Ошибка в переменных окружения."""
-
-    pass
-
-
-class UndocumentedStatusError(Exception):
-    """Недокументированный статус."""
-
-    pass
-
-
 def send_message(bot, message):
     """Отправка сообщения."""
     try:
-        logger.info("Сообщение отправлено")
         bot.send_message(TELEGRAM_CHAT_ID, message)
-    except Exception as error:
-        logger.error(f'Ошибка {error} при отправке сообщения')
-        raise MessageError("Ошибка при отправке сообщения")
+    except exceptions.MessageError:
+        logger.error("Ошибка при отправке сообщения")
+    finally:
+        logger.info("Сообщение отправлено")
 
 
 def get_api_answer(current_timestamp):
@@ -69,9 +46,12 @@ def get_api_answer(current_timestamp):
     params = {"from_date": timestamp}
     try:
         logger.info("отправляем api-запрос")
-        response = requests.get(
-            ENDPOINT, params=params, headers=HEADERS
-        )
+        data = {
+            'url': ENDPOINT,
+            'headers': HEADERS,
+            'params': params
+        }
+        response = requests.get(**data)
 
     except ValueError as error:
         logger.error(f'{error}: не получили api-ответ')
@@ -86,12 +66,10 @@ def get_api_answer(current_timestamp):
     raise TypeError(error_message)
 
 
-homework_error = "Домашняя работа не найдена!"
-dict_error = "dict KeyError"
-
-
-def check_response(response):
+def check_response(response) -> dict:
     """Проверка данные api."""
+    homework_error = "Домашняя работа не найдена!"
+    dict_error = "dict KeyError"
     if isinstance(response, dict) is False:
         raise TypeError("api answer is not dict")
     try:
@@ -120,34 +98,17 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверка наличия токенов."""
-    variables_data = {
-        "PRACTICUM_TOKEN": PRACTICUM_TOKEN,
-        "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
-        "TELEGRAM_CHAT_ID": TELEGRAM_CHAT_ID
-    }
-    no_value = [
-        var_name for var_name, value in variables_data.items() if not value
-    ]
-    if no_value:
-        logger.critical(
-            f'Отсутствует обязательная/ые переменная/ые окружения: {no_value}.'
-            'Программа принудительно остановлена.'
-        )
-        return False
-    logger.info("Необходимые переменные окружения доступны.")
-    return True
-
-
-env_error = "Ошибка в переменных окружения"
+    return all([TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, PRACTICUM_TOKEN])
 
 
 def main():
     """Основная логика работы бота."""
+    env_error = "Ошибка в переменных окружения"
     if not check_tokens():
         logger.critical(env_error)
-        raise TokenError(env_error)
+        os.system.exit(0)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time() - 6048000)
+    current_timestamp = int(time.time())
     tmp_status = None
     errors = True
     while True:
@@ -174,4 +135,10 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename='logger.log',
+        filemode='w',
+        format='%(asctime)s - %(levelname)s - %(message)s- %(name)s - %(lineno)d'
+    )
     main()
