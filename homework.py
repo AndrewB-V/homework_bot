@@ -139,6 +139,7 @@ if __name__ == '__main__':
         level=logging.DEBUG,
         filename='logger.log',
         filemode='w',
-        format='%(asctime)s - %(levelname)s - %(message)s- %(name)s - %(lineno)d'
+        format='%(asctime)s - %(levelname)s - \
+ %(message)s- %(name)s - %(lineno)d'
     )
     main()
