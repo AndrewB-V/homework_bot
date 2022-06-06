@@ -16,7 +16,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 RETRY_TIME = 600
 ENDPOINT = "https://practicum.yandex.ru/api/user_api/homework_statuses/"
-HEADERS = {"Authorization": f'OAuth {PRACTICUM_TOKEN}'}
+# HEADERS = {"Authorization": f'OAuth {PRACTICUM_TOKEN}'}
 VERDICTS = {
     "approved": "Работа проверена: ревьюеру всё понравилось. Ура!",
     "reviewing": "Работа взята на проверку ревьюером.",
@@ -42,28 +42,25 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Получение данных с API YP."""
+    headers = {"Authorization": f'OAuth {PRACTICUM_TOKEN}'}
     timestamp = current_timestamp or int(time.time())
     params = {"from_date": timestamp}
     try:
         logger.info("отправляем api-запрос")
         data = {
             'url': ENDPOINT,
-            'headers': HEADERS,
+            'headers': headers,
             'params': params
         }
         response = requests.get(**data)
 
+        if not response.status_code == requests.codes.ok:
+            raise Exception('Error')
+        return response.json()
+
     except ValueError as error:
         logger.error(f'{error}: не получили api-ответ')
-        raise error
-    error_message = (
-        f'Проблемы соединения с сервером'
-        f'ошибка {response.status_code}'
-    )
-    if response.status_code == requests.codes.ok:
-        return response.json()
-    logger.error(error_message)
-    raise TypeError(error_message)
+        return error
 
 
 def check_response(response) -> dict:
